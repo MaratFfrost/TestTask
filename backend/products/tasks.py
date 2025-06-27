@@ -1,0 +1,166 @@
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.common.by import By
+from bs4 import BeautifulSoup
+import time
+import random
+import re
+from urllib.parse import quote
+from celery import shared_task
+
+from products.models import Product
+
+
+def setup_driver():
+    options = Options()
+    options.add_argument("--headless=new")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument("--ignore-certificate-errors")
+    options.add_argument("--ignore-ssl-errors")
+    prefs = {"profile.managed_default_content_settings.images": 0}
+    options.add_experimental_option("prefs", prefs)
+
+    driver = webdriver.Chrome(options=options)
+    return driver
+
+
+def extract_price(text):
+    if not text:
+        return None
+    match = re.search(r'[\d\s]+₽', text)
+    return match.group(0).strip() if match else text.strip()
+
+
+def parse_search(query, max_items=20):
+    driver = setup_driver()
+    start_time = time.time()
+    try:
+        encoded_query = quote(query)
+        url = f"https://www.wildberries.ru/catalog/0/search.aspx?search={encoded_query}"
+        driver.get(url)
+
+        WebDriverWait(driver, 15).until(
+            EC.presence_of_element_located((
+                By.CSS_SELECTOR,
+                "article[data-nm-id]"))
+        )
+
+        last_height = driver.execute_script("return document.body.scrollHeight")
+        while len(driver.find_elements(By.CSS_SELECTOR, "article[data-nm-id]")) < max_items:
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(random.uniform(1, 2))
+            new_height = driver.execute_script("return document.body.scrollHeight")
+            if new_height == last_height:
+                break
+            last_height = new_height
+
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        products = []
+
+        for card in soup.find_all('article', attrs={'data-nm-id': True}):
+            if len(products) >= max_items:
+                break
+
+            name_tag = card.select_one('.product-card__name')
+            name = name_tag.get_text(strip=True) if name_tag else ''
+            full_name = f"{name}".strip()
+
+            curr = card.select_one('.price__lower-price')
+            old = card.select_one('.price__old-price, del')
+            current_price = extract_price(curr.get_text()) if curr else None
+            old_price = extract_price(old.get_text()) if old else None
+
+            rating = None
+            reviews = None
+            rating_tag = card.select_one('.address-rate-mini')
+            reviews_tag = card.select_one('.product-card__count')
+            if rating_tag:
+                rating = rating_tag.get_text(strip=True)
+            if reviews_tag:
+                reviews = reviews_tag.get_text(strip=True)
+
+            products.append({
+                'name': full_name[1:],
+                'current_price': float(current_price.replace('₽', '').replace(' ', '').replace('\xa0', '')),
+                'old_price': float(old_price.replace('₽', '').replace(' ', '').replace('\xa0', '')),
+                'rating': float(rating.replace(',', '.')) if rating else 0,
+                'reviews_count': int(reviews.replace('\xa0', '').split()[0]) if reviews.replace('\xa0', '').split()[0] != 'Нет' else 0
+            })
+
+        return products
+
+    finally:
+        driver.quit()
+        print(f"Завершено за {time.time() - start_time:.2f} секунд")
+
+
+@shared_task(bind=True)
+def parse_wb_task(self, query,
+                  min_price=None,
+                  max_price=None,
+                  min_rating=None,
+                  max_rating=None,
+                  max_items=30):
+    try:
+        if isinstance(query, bytes):
+            query = query.decode('utf-8')
+
+        products = parse_search(query, max_items)
+
+        if min_price is not None:
+            min_price = float(min_price)
+        if max_price is not None:
+            max_price = float(max_price)
+        if min_rating is not None:
+            min_rating = float(min_rating)
+        if max_rating is not None:
+            max_rating = float(max_rating)
+
+        filtered_products = []
+        for p in products:
+            price = p.get('current_price')
+            rating = p.get('rating')
+
+            if price is not None:
+                price = float(price)
+            if rating is not None:
+                rating = float(rating)
+
+            if min_price is not None and (price < min_price):
+                continue
+            if max_price is not None and (price > max_price):
+                continue
+
+
+            if min_rating is not None and (rating < min_rating):
+                continue
+            if max_rating is not None and (rating > max_rating):
+                continue
+
+            filtered_products.append(p)
+
+
+        for p in filtered_products:
+            Product.objects.create(
+                name=p.get('name'),
+                price=p.get('current_price'),
+                discount_price=p.get('old_price'),
+                rating=p.get('rating'),
+                review_count=p.get('reviews_count')
+            )
+
+        return {
+            'status': 'success',
+            'items_parsed': len(filtered_products),
+            'products': filtered_products
+        }
+    except Exception as e:
+        return {
+            'status': 'error',
+            'message': str(e),
+            'query': f'{query}'
+        }
