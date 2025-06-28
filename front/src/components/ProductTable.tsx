@@ -13,8 +13,8 @@ const ProductTable: React.FC<Props> = ({ products }) => {
         <thead>
           <tr className="bg-gray-100">
             <th className="px-4 py-2 text-left">Название</th>
-            <th className="px-4 py-2 text-left">Цена</th>
-            <th className="px-4 py-2 text-left">Старая цена</th>
+            <th className="px-4 py-2 text-left">Цена со скидкой</th>
+            <th className="px-4 py-2 text-left">Цена без скидки</th>
             <th className="px-4 py-2 text-left">Рейтинг</th>
             <th className="px-4 py-2 text-left">Отзывы</th>
           </tr>
@@ -23,12 +23,10 @@ const ProductTable: React.FC<Props> = ({ products }) => {
           {products.map((product, index) => (
             <tr key={index} className="border-t">
               <td className="px-4 py-2">{product.name}</td>
-              <td className="px-4 py-2">{product.price} ₽</td>
-              <td className="px-4 py-2 text-gray-500 line-through">
-                {product.discount_price ? `${product.discount_price} ₽` : '-'}
-              </td>
+              <td className="px-4 py-2">{product.current_price} ₽</td>
+              <td className="px-4 py-2">{product.old_price} ₽</td>
               <td className="px-4 py-2">{product.rating}</td>
-              <td className="px-4 py-2">{product.review_count}</td>
+              <td className="px-4 py-2">{product.reviews_count}</td>
             </tr>
           ))}
         </tbody>

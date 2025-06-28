@@ -35,12 +35,13 @@ def extract_price(text):
     return match.group(0).strip() if match else text.strip()
 
 
-def parse_search(query, max_items=20):
+def parse_search(query, max_items=20,):
     driver = setup_driver()
     start_time = time.time()
     try:
         encoded_query = quote(query)
         url = f"https://www.wildberries.ru/catalog/0/search.aspx?search={encoded_query}"
+
         driver.get(url)
 
         WebDriverWait(driver, 15).until(
@@ -103,46 +104,37 @@ def parse_wb_task(self, query,
                   min_price=None,
                   max_price=None,
                   min_rating=None,
-                  max_rating=None,
                   max_items=30):
     try:
         if isinstance(query, bytes):
             query = query.decode('utf-8')
-
-        products = parse_search(query, max_items)
+        filters = {}
 
         if min_price is not None:
             min_price = float(min_price)
+            filters['min_price'] = min_price
         if max_price is not None:
             max_price = float(max_price)
+            filters['max_price'] = max_price
         if min_rating is not None:
             min_rating = float(min_rating)
-        if max_rating is not None:
-            max_rating = float(max_rating)
+            filters['min_rating'] = min_rating
+
+        products = parse_search(query)
 
         filtered_products = []
         for p in products:
-            price = p.get('current_price')
-            rating = p.get('rating')
+            price = p['current_price']
+            rating = p['rating']
 
-            if price is not None:
-                price = float(price)
-            if rating is not None:
-                rating = float(rating)
-
-            if min_price is not None and (price < min_price):
+            if 'min_price' in filters and price < filters['min_price']:
                 continue
-            if max_price is not None and (price > max_price):
+            if 'max_price' in filters and price > filters['max_price']:
                 continue
-
-
-            if min_rating is not None and (rating < min_rating):
-                continue
-            if max_rating is not None and (rating > max_rating):
+            if 'min_rating' in filters and rating < filters['min_rating']:
                 continue
 
             filtered_products.append(p)
-
 
         for p in filtered_products:
             Product.objects.create(
@@ -156,7 +148,11 @@ def parse_wb_task(self, query,
         return {
             'status': 'success',
             'items_parsed': len(filtered_products),
-            'products': filtered_products
+            'min_price': min_price,
+            'max_price': max_price,
+            'min_rating': min_rating,
+            'max_items': max_items,
+            'products': filtered_products,
         }
     except Exception as e:
         return {

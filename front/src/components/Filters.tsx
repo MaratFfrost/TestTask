@@ -5,8 +5,6 @@ interface Props {
     minPrice: number;
     maxPrice: number;
     minRating: number;
-    minReviews: number;
-    maxReviews: number;
     sortBy: string;
     sortOrder: 'asc' | 'desc';
   };
@@ -47,15 +45,6 @@ const Filters: React.FC<Props> = ({ filters, setFilters }) => {
         />
       </div>
       <div>
-        <label className="block text-sm">Мин. кол-во отзывов</label>
-        <input
-          type="number"
-          value={filters.minReviews}
-          onChange={(e) => setFilters((f: any) => ({ ...f, minReviews: Number(e.target.value) }))}
-          className="w-full border rounded px-2 py-1"
-        />
-      </div>
-      <div>
         <label className="block text-sm">Сортировать по</label>
         <select
           value={filters.sortBy}
@@ -63,11 +52,10 @@ const Filters: React.FC<Props> = ({ filters, setFilters }) => {
           className="w-full border rounded px-2 py-1"
         >
           <option value="">Без сортировки</option>
-          <option value="price">Цене</option>
-          <option value="discount_price">Старой цене</option>
+          <option value="current_price">Цена со скидкой</option>
+          <option value="old_price">Цена без скидки</option>
           <option value="rating">Рейтингу</option>
-          <option value="review_count">Кол-ву отзывов</option>
-          <option value="name">Названию</option>
+          <option value="reviews_count">Кол-ву отзывов</option>
         </select>
       </div>
       <div>

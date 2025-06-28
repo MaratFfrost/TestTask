@@ -1,10 +1,10 @@
 export interface Product {
   id: number;
   name: string;
-  price: number;
+  current_price: number;
+  old_price: number;
   rating: number;
-  review_count: number;
-  discount_price?: number; // если где-то используется
+  reviews_count: number;
 }
 
 export interface Filter {

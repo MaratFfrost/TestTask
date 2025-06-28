@@ -21,20 +21,16 @@ class ParseConsumer(AsyncWebsocketConsumer):
         min_price = data.get("min_price")
         max_price = data.get("max_price")
         min_rating = data.get("min_rating")
-        max_rating = data.get("max_rating")
-        max_items = data.get("max_items")
 
         if data.get("action") == "start":
             from .tasks import parse_wb_task
 
             task = parse_wb_task.delay(
                 query,
-                max_items=max_items,
                 min_price=min_price,
                 max_price=max_price,
                 min_rating=min_rating,
-                max_rating=max_rating
-              )
+                )
 
             await self.send(text_data=json.dumps({
                 "status": "started",
