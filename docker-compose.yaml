@@ -19,14 +19,15 @@ services:
     image: backend
     container_name: backend_app
     command: >
-      sh -c "sleep 5 && python manage.py makemigrations && python manage.py migrate && daphne backend.asgi:application"
+      sh -c "sleep 5 && python manage.py makemigrations && python manage.py migrate &&
+         daphne -b 0.0.0.0 -p 8000 backend.asgi:application"
     env_file:
       - .env-non-dev
     depends_on:
       - db
       - redis
     ports:
-      - "7777:8000"
+      - "7788:8000"
     volumes:
       - ./backend:/code
 

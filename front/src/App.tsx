@@ -47,7 +47,8 @@ const App: React.FC = () => {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   useEffect(() => {
-    const ws = new WebSocket(`ws://localhost:8000/ws/parse/`);
+    const ws = new WebSocket("ws://localhost:7788/ws/parse/")
+
 
     ws.onopen = () => console.log('WebSocket открыт');
     ws.onclose = () => console.log('WebSocket закрыт');

@@ -1,5 +1,6 @@
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.firefox.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
@@ -15,17 +16,23 @@ from products.models import Product
 
 def setup_driver():
     options = Options()
-    options.add_argument("--headless=new")
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-    options.add_argument("--window-size=1920,1080")
-    options.add_argument("--ignore-certificate-errors")
-    options.add_argument("--ignore-ssl-errors")
-    prefs = {"profile.managed_default_content_settings.images": 0}
-    options.add_experimental_option("prefs", prefs)
+    options.add_argument("--headless")
+    options.set_preference("dom.webdriver.enabled", False)
+    options.set_preference("useAutomationExtension", False)
+    options.set_preference("extensions.logging.enabled", False)
+    options.set_preference("browser.download.folderList", 2)
+    options.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/octet-stream")
 
-    driver = webdriver.Chrome(options=options)
-    return driver
+    options.set_preference("permissions.default.image", 0)
+    options.set_preference("dom.ipc.plugins.enabled.libflashplayer.so", False)
+
+    service = Service(executable_path='/usr/local/bin/geckodriver')
+
+    try:
+        driver = webdriver.Firefox(service=service, options=options)
+        return driver
+    except Exception as e:
+        raise Exception(f"Failed to initialize Firefox driver: {str(e)}")
 
 
 def extract_price(text):
@@ -37,7 +44,6 @@ def extract_price(text):
 
 def parse_search(query, max_items=20,):
     driver = setup_driver()
-    start_time = time.time()
     try:
         encoded_query = quote(query)
         url = f"https://www.wildberries.ru/catalog/0/search.aspx?search={encoded_query}"
@@ -96,7 +102,6 @@ def parse_search(query, max_items=20,):
 
     finally:
         driver.quit()
-        print(f"Завершено за {time.time() - start_time:.2f} секунд")
 
 
 @shared_task(bind=True)
