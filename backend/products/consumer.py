@@ -12,6 +12,7 @@ class ParseConsumer(AsyncWebsocketConsumer):
         pass
 
     async def receive(self, text_data):
+      try:
         if not text_data:
             await self.send(text_data=json.dumps({"error": "Пусто"}))
             return
@@ -39,6 +40,7 @@ class ParseConsumer(AsyncWebsocketConsumer):
             }))
 
         elif data.get("action") == "check":
+
             task_id = data.get("task_id")
 
             if not task_id:
@@ -58,3 +60,9 @@ class ParseConsumer(AsyncWebsocketConsumer):
                 response["result"] = result.result
 
             await self.send(text_data=json.dumps(response))
+
+      except Exception as e:
+          await self.send(text_data=json.dumps({
+              "status": "error",
+              "message": str(e)
+          }))
